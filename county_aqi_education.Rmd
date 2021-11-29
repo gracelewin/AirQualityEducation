@@ -16,6 +16,13 @@ library(janitor)
 library(lubridate)
 ```
 
+[Poverty and Education datasets found here](https://www.ers.usda.gov/data-products/county-level-data-sets/)
+
+[Air Quality AQI data found here](https://aqs.epa.gov/aqsweb/airdata/download_files.html#AQI)
+
+
+
+
 
 
 ```{r}
