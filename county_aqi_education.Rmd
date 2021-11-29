@@ -1,0 +1,80 @@
+---
+title: "AirQualityandEducation"
+author: "Grace Lewin"
+date: "11/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+```
+
+
+
+```{r}
+education <- read_csv(here("data", "Education_2015_2019.csv")) %>% 
+  clean_names() %>% 
+  select(fips, county, x2013_rural_urban_continuum_code, 
+         not_completing_high_school_2015_2019, completing_high_school_2015_2019,
+         completing_some_college_2015_2019, completing_college_2015_2019) %>% 
+  separate(col = county, into = c("county", "state"), sep = ",")
+
+ca_aqi_2015 <- read_csv(here("data", "daily_aqi_by_county_2015.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California")
+
+ca_aqi_2016 <- read_csv(here("data", "daily_aqi_by_county_2016.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California")
+
+ca_aqi_2017 <- read_csv(here("data", "daily_aqi_by_county_2017.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California")
+
+ca_aqi_2018 <- read_csv(here("data", "daily_aqi_by_county_2018.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California")
+
+ca_aqi_2019 <- read_csv(here("data", "daily_aqi_by_county_2019.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California")
+
+ca_aqi_all <- rbind(ca_aqi_2015, ca_aqi_2016, ca_aqi_2017, ca_aqi_2018, ca_aqi_2019) %>% 
+  mutate(date = as.Date(date)) %>% 
+  rename(county = county_name)
+
+aqi_education <- left_join(ca_aqi_all, education) %>% 
+  rename(nchs = not_completing_high_school_2015_2019) %>% 
+  rename(chs = completing_high_school_2015_2019) %>% 
+  rename(csc = completing_some_college_2015_2019) %>% 
+  rename(cc = completing_college_2015_2019)
+  
+aqi_education$nchs <- as.numeric(sub("%", "", aqi_education$nchs))
+aqi_education$chs <- as.numeric(sub("%", "", aqi_education$chs))
+aqi_education$csc <- as.numeric(sub("%", "", aqi_education$csc))
+aqi_education$cc <- as.numeric(sub("%", "", aqi_education$cc))
+```
+
+
+```{r}
+aqi_education_avg_aqi <- aqi_education %>% 
+  group_by(county, nchs, chs, csc, cc) %>% 
+  summarise(mean_aqi = mean(aqi))
+```
+
+
+
+```{r}
+ggplot(aqi_education_avg_aqi, aes(x = nchs, y = mean_aqi)) +
+  geom_point()
+```
+
+
+
