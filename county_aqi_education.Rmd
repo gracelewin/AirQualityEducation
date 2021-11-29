@@ -181,7 +181,23 @@ ggplot(aqi_poverty_avg_aqi, aes(x = ruc_code, y = mean_aqi)) +
   geom_smooth(method='lm', formula= y~x, color="lightcoral", se=T, size=1.5) +
   theme_minimal()
 
+mod <- lm(mean_aqi ~ ruc_code, data =aqi_poverty_avg_aqi)
+summary(mod)
+summary(mod)$r.squared
+```
+
+
+```{r}
 mod <- lm(mean_aqi ~ ruc_code + poverty_perc, data =aqi_poverty_avg_aqi)
+summary(mod)
+#summary(mod)$r.squared
+```
+
+
+
+
+```{r}
+mod <- lm(mean_aqi ~ nchs + poverty_perc, data =aqi_education_poverty_avg_aqi)
 summary(mod)
 summary(mod)$r.squared
 ```
