@@ -1,0 +1,187 @@
+---
+title: "Effect of Education and Poverty on Average AQI of Counties in California"
+author: "Grace Lewin"
+date: "11/28/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+[Poverty and Education datasets found here](https://www.ers.usda.gov/data-products/county-level-data-sets/)
+
+[Air Quality AQI data found here](https://aqs.epa.gov/aqsweb/airdata/download_files.html#AQI)
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+```
+
+
+```{r}
+education <- read_csv(here("data", "Education_2015_2019.csv")) %>% 
+  clean_names() %>% 
+  select(fips, county, x2013_rural_urban_continuum_code, 
+         not_completing_high_school_2015_2019, completing_high_school_2015_2019,
+         completing_some_college_2015_2019, completing_college_2015_2019) %>% 
+  separate(col = county, into = c("county", "state"), sep = ",")
+
+ca_aqi_2015 <- read_csv(here("data", "daily_aqi_by_county_2015.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California") %>% 
+  rename(county = county_name)
+
+ca_aqi_2016 <- read_csv(here("data", "daily_aqi_by_county_2016.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California") %>% 
+  rename(county = county_name)
+
+ca_aqi_2017 <- read_csv(here("data", "daily_aqi_by_county_2017.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California") %>% 
+  rename(county = county_name)
+
+ca_aqi_2018 <- read_csv(here("data", "daily_aqi_by_county_2018.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California") %>% 
+  rename(county = county_name)
+
+ca_aqi_2019 <- read_csv(here("data", "daily_aqi_by_county_2019.csv")) %>% 
+  clean_names() %>% 
+  filter(state_name == "California") %>% 
+  rename(county = county_name)
+
+ca_aqi_all <- rbind(ca_aqi_2015, ca_aqi_2016, ca_aqi_2017, ca_aqi_2018, ca_aqi_2019) %>% 
+  mutate(date = as.Date(date))
+
+aqi_education <- left_join(ca_aqi_all, education) %>% 
+  rename(nchs = not_completing_high_school_2015_2019) %>% 
+  rename(chs = completing_high_school_2015_2019) %>% 
+  rename(csc = completing_some_college_2015_2019) %>% 
+  rename(cc = completing_college_2015_2019)
+  
+aqi_education$nchs <- as.numeric(sub("%", "", aqi_education$nchs))
+aqi_education$chs <- as.numeric(sub("%", "", aqi_education$chs))
+aqi_education$csc <- as.numeric(sub("%", "", aqi_education$csc))
+aqi_education$cc <- as.numeric(sub("%", "", aqi_education$cc))
+
+
+```
+
+# Poverty
+
+```{r}
+ca_poverty_2019 <- read_csv(here("data", "ca_poverty_2019.csv")) %>% 
+  select(fips, county, ruc_code, percent, lowerbound, upperbound) %>% 
+  rename(poverty_perc = percent)
+
+aqi_poverty <- left_join(ca_aqi_2019, ca_poverty_2019, by = "county")
+
+aqi_poverty_avg_aqi <- aqi_poverty %>% 
+  group_by(county, poverty_perc, ruc_code) %>% 
+  summarise(mean_aqi = mean(aqi))
+```
+
+
+## Join poverty dataset with aqi and education
+
+```{r}
+aqi_education_poverty <- left_join(aqi_education, ca_poverty_2019)
+
+aqi_education_poverty_avg_aqi <- aqi_education_poverty %>% 
+  group_by(county, poverty_perc, ruc_code, nchs, chs, csc, cc) %>% 
+  summarise(mean_aqi = mean(aqi))
+```
+
+
+```{r}
+aqi_education_avg_aqi <- aqi_education %>% 
+  group_by(county, nchs, chs, csc, cc) %>% 
+  summarise(mean_aqi = mean(aqi)) %>% 
+  mutate(sum = sum(nchs, chs, csc, cc))
+```
+
+
+## The effect of not completing high school on mean aqi in a county from 2015 - 2019
+
+```{r}
+ggplot(aqi_education_avg_aqi, aes(x = nchs, y = mean_aqi)) +
+  geom_point() +
+  labs(title = "Not Completing High School Percentages vs Poverty Percentages") +
+  geom_text(aes(label=county),hjust=0, vjust=1) +
+  geom_smooth(method='lm', formula= y~x, color="lightcoral", se=T, size=1.5) +
+  theme_minimal()
+
+mod <- lm(mean_aqi ~ nchs, data =aqi_education_avg_aqi)
+summary(mod)
+```
+
+
+
+# Poverty and AQI
+
+## The effect of poverty on mean aqi in a county in CA in 2019
+
+```{r}
+ggplot(aqi_poverty_avg_aqi, aes(x = poverty_perc, y = mean_aqi)) +
+  geom_point() +
+  geom_text(aes(label=county),hjust=0, vjust=1) +
+  geom_smooth(method='lm', formula= y~x, color="lightcoral", se=T, size=1.5) +
+  theme_minimal()
+
+mod <- lm(mean_aqi ~ poverty_perc, data =aqi_poverty_avg_aqi)
+summary(mod)
+summary(mod)$r.squared
+```
+
+```{r}
+ggplot(aqi_education_poverty_avg_aqi, aes(x = poverty_perc, y = nchs)) +
+  geom_point() +
+  geom_text(aes(label=county),hjust=0, vjust=1) +
+  geom_smooth(method='lm', formula= y~x, color="lightcoral", se=T, size=1.5) +
+  theme_minimal()
+
+mod <- lm(nchs ~ poverty_perc, data =aqi_education_poverty_avg_aqi)
+summary(mod)
+summary(mod)$r.squared
+```
+
+
+
+## **Multiple linear regression of not completing high school and poverty percentage on average aqi in a CA county using education data from 2015-2019 and poverty data from 2019.**
+
+```{r}
+mod <- lm(mean_aqi ~ nchs + poverty_perc, data =aqi_education_poverty_avg_aqi)
+summary(mod)
+summary(mod)$r.squared
+```
+### Interpretation for the above regression:
+- Null hypothesis: There is no effect of not completing high school on mean county AQI in CA.
+
+- Alternative Hypothesis: There is an effect of not completing high school on mean county AQI in CA.
+
+- The slope coefficient on not completing high school is 0.7297. This means with each 1 percentage increase in the percentage of people in a county who did not complete high school, there is a 0.7297 increase in the AQI index (unitless from 0-500). The p-value of this slope is 0.0288. This is low enough (less than 0.05) to reject the null that there is no effect of not completing high school on the mean AQI of a county in CA. 
+
+- The slope coefficient on the percentage of people in poverty is 0.3760. This means that with each increase in the percentage of people in poverty in a county, there is a 0.3760 increase in the average AQI index (unitless from 0-500). The p-value of this slop is 0.5261. This is too high to reject the null hypothesis that the percentage of people in poverty in a county has an effict on the mean AQI of that county.
+
+- Therefore, according to these results, not completing high school is a stronger indicator of mean AQI than poverty is. 
+
+- I find this very interesting because it is not what I would have originally expected.
+
+- However, there is a high potential for omitted variable bias in this regression. Possible omitted variables could be income, race and/or ethnicity, or how rural an area is. 
+
+
+
+The fact that the coefficient goes down for nchs and the p-value goes up is indicative of omitted variable bias and suggests that poverty was an omitted variable in the first regression of just nchs and aqi. 
+
+Do a regression of just nchs and poverty to make sure it's a positive correlation. 
+
+.02 p-value means that there is 2% chance that the null hypothesis is true. Since this is so low, we can reject the null hypothesis.
+
+Do a confidence interval.
+
